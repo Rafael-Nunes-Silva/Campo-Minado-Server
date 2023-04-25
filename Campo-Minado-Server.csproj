@@ -38,6 +38,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CampoMinadoServer.cs" />
+    <Compile Include="GameRoom.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System" />
