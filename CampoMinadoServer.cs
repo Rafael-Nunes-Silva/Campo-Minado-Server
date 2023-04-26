@@ -31,8 +31,16 @@ class Campo_Minado_Server
         bool running = true;
         while (running)
         {
-
+            switch (Console.ReadLine().ToLower())
+            {
+                case "-close_server":
+                    running = false;
+                    break;
+            }
         }
+
+        for(int i=0; i<gameRooms.Count;i++)
+            gameRooms[i].Close();
     }
 
     static void ListenForConnections()
@@ -42,8 +50,16 @@ class Campo_Minado_Server
         {
             try
             {
-                TcpClient player = listener.AcceptTcpClient();
-                Task.Run(new Action(() => { ManagePlayer(player); }));
+                TcpClient tcpConn = listener.AcceptTcpClient();
+
+                Byte[] buffer = new Byte[128];
+                int size = tcpConn.GetStream().Read(buffer, 0, buffer.Length);
+
+                string name = Encoding.UTF8.GetString(buffer).Substring(0, size);
+
+                Task.Run(new Action(() => { ManagePlayer(new Player(name, tcpConn)); }));
+
+                Console.WriteLine($"{name} conectou");
             }
             catch (Exception e)
             {
@@ -71,30 +87,50 @@ class Campo_Minado_Server
         }
     }
 
-    static void ManagePlayer(TcpClient player)
+    static void ManagePlayer(Player player)
     {
-        while (player.Connected)
+        while (player.connection.Connected)
         {
             try
             {
-                Byte[] buffer = new Byte[256];
-                int size = player.GetStream().Read(buffer, 0, buffer.Length);
+                string[] content = player.Read().Split('|');
 
-                string[] content = Encoding.UTF8.GetString(buffer).Substring(0, size).Split('|');
+                switch (content[0])
+                {
+                    case "DISCONNECT":
+                        player.connection.Close();
+                        break;
+                    case "CREATE_ROOM":
+                        GameRoom gameRoom = new GameRoom(listener, player, content[1], int.Parse(content[2]));
 
-                gameRooms.Add(new GameRoom(listener, player, content[0], int.Parse(content[1])));
+                        gameRooms.Add(gameRoom);
+                        // gameRooms.Add(new GameRoom(listener, player.connection, content[1], int.Parse(content[2])));
 
-                Console.WriteLine($"Sala criada\nNome: {content[0]}\nMáximo de jogadores: {content[1]}");
+                        Task.Run(new Action(() => { ManageRoom(gameRoom); }));
+
+                        Console.WriteLine($"Sala criada por {player.GetName()}\nNome: {content[1]}\nMáximo de jogadores: {content[2]}");
+
+                        player.Write("SUCCESS");
+                        break;
+                }
             }
             catch (Exception e)
             {
-                Console.WriteLine(e);
+                Console.WriteLine($"{player.GetName()} desconectou");
+                break;
             }
         }
     }
 
-    static void CreateRoom()
+    static void ManageRoom(GameRoom gameRoom)
     {
-
+        while (gameRoom.PlayersConnected() > 0)
+        {
+            for (int i = 0; i < gameRoom.players.Count; i++)
+            {
+                // gameRoom.players[i].Write($"CONNECTED|{gameRoom.GetName()}");
+            }
+        }
+        Console.WriteLine($"A sala {gameRoom.GetName()} foi fechada");
     }
 }
