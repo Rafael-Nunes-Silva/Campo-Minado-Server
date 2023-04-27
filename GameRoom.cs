@@ -34,6 +34,11 @@ public class GameRoom
         return name;
     }
 
+    public int GetPlayerCount()
+    {
+        return players.Count;
+    }
+
     public int GetMaxPlayers()
     {
         return maxPlayers;
@@ -42,5 +47,14 @@ public class GameRoom
     public int PlayersConnected()
     {
         return players.Count;
+    }
+
+    public bool AddPlayer(Player player)
+    {
+        if (players.Count >= maxPlayers)
+            return false;
+        players.Add(player);
+        Console.WriteLine($"{player.GetName()} conectou a sala {name}");
+        return true;
     }
 }

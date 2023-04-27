@@ -7,6 +7,9 @@ using System.Net.Sockets;
 
 class Campo_Minado_Server
 {
+    public static readonly string SUCCESS_MSG = "SUCCESS";
+    public static readonly string FAILED_MSG = "FAILED";
+
     static int maxGameRooms = 4;
     static List<GameRoom> gameRooms = new List<GameRoom>(0);
 
@@ -100,6 +103,21 @@ class Campo_Minado_Server
                     case "DISCONNECT":
                         player.connection.Close();
                         break;
+                    case "CONNECT":
+                        for (int i = 0; i < gameRooms.Count; i++)
+                        {
+                            if (gameRooms[i].GetName() == content[1])
+                            {
+                                if (!gameRooms[i].AddPlayer(player))
+                                {
+                                    player.Write(SUCCESS_MSG);
+                                    break;
+                                }
+                                player.Write(FAILED_MSG);
+                                break;
+                            }
+                        }
+                        break;
                     case "CREATE_ROOM":
                         GameRoom gameRoom = new GameRoom(listener, player, content[1], int.Parse(content[2]));
 
@@ -110,7 +128,15 @@ class Campo_Minado_Server
 
                         Console.WriteLine($"Sala criada por {player.GetName()}\nNome: {content[1]}\nMáximo de jogadores: {content[2]}");
 
-                        player.Write("SUCCESS");
+                        player.Write(SUCCESS_MSG);
+                        break;
+                    case "GET_ROOMS":
+                        string msg = "Salas:\nNome | Espaço\n";
+                        for(int i=0; i < gameRooms.Count; i++)
+                        {
+                            msg += $"{gameRooms[i].GetName()} | {gameRooms[i].GetPlayerCount()}/{gameRooms[i].GetMaxPlayers()}\n";
+                        }
+                        player.Write(msg);
                         break;
                 }
             }
