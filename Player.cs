@@ -8,12 +8,22 @@ using System.Net.Sockets;
 public class Player
 {
     string name;
-    public TcpClient connection;
+    TcpClient connection;
 
     public Player(string name, TcpClient connection)
     {
         this.name = name;
         this.connection = connection;
+    }
+
+    public void Disconnect()
+    {
+        connection.Close();
+    }
+
+    public bool IsConnected()
+    {
+        return connection.Connected;
     }
 
     public string GetName()

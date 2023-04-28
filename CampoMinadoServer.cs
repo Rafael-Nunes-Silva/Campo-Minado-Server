@@ -92,7 +92,7 @@ class Campo_Minado_Server
 
     static void ManagePlayer(Player player)
     {
-        while (player.connection.Connected)
+        while (player.IsConnected())
         {
             try
             {
@@ -101,7 +101,7 @@ class Campo_Minado_Server
                 switch (content[0])
                 {
                     case "DISCONNECT":
-                        player.connection.Close();
+                        player.Disconnect();
                         break;
                     case "CONNECT":
                         for (int i = 0; i < gameRooms.Count; i++)
@@ -118,7 +118,7 @@ class Campo_Minado_Server
                         player.Write(FAILED_MSG);
                         break;
                     case "CREATE_ROOM":
-                        GameRoom gameRoom = new GameRoom(player, content[1], int.Parse(content[2]));
+                        GameRoom gameRoom = new GameRoom(content[1], int.Parse(content[2]));
 
                         gameRooms.Add(gameRoom);
                         // gameRooms.Add(new GameRoom(listener, player.connection, content[1], int.Parse(content[2])));
@@ -147,6 +147,10 @@ class Campo_Minado_Server
 
     static void ManageRoom(GameRoom gameRoom)
     {
+        while (!gameRoom.Full()) { }
+
+
+
         while (gameRoom.PlayersConnected() > 0)
         {
             for (int i = 0; i < gameRoom.players.Count; i++)

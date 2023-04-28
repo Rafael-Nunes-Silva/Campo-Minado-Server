@@ -5,31 +5,45 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Net.Sockets;
 
+/*
+public struct GameData {
+    int flags;
+    public GameData(int flags)
+    {
+        this.flags = flags;
+    }
+}
+*/
+
 public class GameRoom
 {
     string name = "Default room name";
     int maxPlayers = 2;
 
     public List<Player> players = new List<Player>(0);
+    // public Dictionary<Player, GameData> players = new Dictionary<Player, GameData>(0);
 
-    public GameRoom(Player player, string name, int maxPlayers)
+    public GameRoom(string name, int maxPlayers)
     {
         this.name = name;
         this.maxPlayers = maxPlayers;
-
-        players.Add(player);
     }
 
     public void Close()
     {
         for (int i = 0; i < players.Count; i++)
-            players[i].connection.Close();
+            players[i].Disconnect();
         players.Clear();
     }
 
     public string GetName()
     {
         return name;
+    }
+
+    public bool Full()
+    {
+        return players.Count == maxPlayers;
     }
 
     public int GetPlayerCount()
