@@ -113,13 +113,12 @@ class Campo_Minado_Server
                                     player.Write(SUCCESS_MSG);
                                     break;
                                 }
-                                player.Write(FAILED_MSG);
-                                break;
                             }
                         }
+                        player.Write(FAILED_MSG);
                         break;
                     case "CREATE_ROOM":
-                        GameRoom gameRoom = new GameRoom(listener, player, content[1], int.Parse(content[2]));
+                        GameRoom gameRoom = new GameRoom(player, content[1], int.Parse(content[2]));
 
                         gameRooms.Add(gameRoom);
                         // gameRooms.Add(new GameRoom(listener, player.connection, content[1], int.Parse(content[2])));
@@ -132,10 +131,8 @@ class Campo_Minado_Server
                         break;
                     case "GET_ROOMS":
                         string msg = "Salas:\nNome | Espaço\n";
-                        for(int i=0; i < gameRooms.Count; i++)
-                        {
+                        for (int i = 0; i < gameRooms.Count; i++)
                             msg += $"{gameRooms[i].GetName()} | {gameRooms[i].GetPlayerCount()}/{gameRooms[i].GetMaxPlayers()}\n";
-                        }
                         player.Write(msg);
                         break;
                 }

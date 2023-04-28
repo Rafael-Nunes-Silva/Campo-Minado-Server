@@ -28,10 +28,7 @@ public class Player
             Byte[] buffer = Encoding.UTF8.GetBytes(msg);
             connection.GetStream().Write(buffer, 0, buffer.Length);
         }
-        catch (Exception e)
-        {
-            return false;
-        }
+        catch (Exception e) { return false; }
         return true;
     }
     

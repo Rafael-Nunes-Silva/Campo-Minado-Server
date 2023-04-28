@@ -11,11 +11,9 @@ public class GameRoom
     int maxPlayers = 2;
 
     public List<Player> players = new List<Player>(0);
-    TcpListener listener;
 
-    public GameRoom(TcpListener listener, Player player, string name, int maxPlayers)
+    public GameRoom(Player player, string name, int maxPlayers)
     {
-        this.listener = listener;
         this.name = name;
         this.maxPlayers = maxPlayers;
 
