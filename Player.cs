@@ -8,22 +8,28 @@ using System.Net.Sockets;
 public class Player
 {
     string name;
-    TcpClient connection;
+    TcpClient tcpConn;
+    public bool ready = false;
 
-    public Player(string name, TcpClient connection)
+    List<KeyValuePair<string, string[]>> messageQueue = new List<KeyValuePair<string, string[]>>(0);
+
+    public Player(TcpClient tcpConn)
     {
-        this.name = name;
-        this.connection = connection;
+        this.tcpConn = tcpConn;
+        Task.Run(Listen);
+
+        if (Read(out string[] nameMsg, "NAME"))
+            name = nameMsg[0];
     }
 
     public void Disconnect()
     {
-        connection.Close();
+        tcpConn.Close();
     }
 
     public bool IsConnected()
     {
-        return connection.Connected;
+        return tcpConn.Connected;
     }
 
     public string GetName()
@@ -31,22 +37,110 @@ public class Player
         return name;
     }
 
+    /*
     public bool Write(string msg)
     {
         try
         {
             Byte[] buffer = Encoding.UTF8.GetBytes(msg);
-            connection.GetStream().Write(buffer, 0, buffer.Length);
+            tcpConn.GetStream().Write(buffer, 0, buffer.Length);
         }
         catch (Exception e) { return false; }
         return true;
     }
-    
-    public string Read()
-    {
-        Byte[] buffer = new Byte[256];
-        int size = connection.GetStream().Read(buffer, 0, buffer.Length);
+    */
 
-        return Encoding.UTF8.GetString(buffer).Substring(0, size);
+    public bool Write(params string[] msgParts)
+    {
+        try
+        {
+            string msg = "";
+            if (msgParts.Length > 1)
+            {
+                msg = $"|{msgParts[0]}?";
+                for (int i = 1; i < msgParts.Length; i++)
+                    msg += $"{msgParts[i]}{(i < msgParts.Length ? "&" : "")}";
+                msg += "|";
+            }
+            else msg = $"|{msgParts[0]}|";
+
+            Byte[] buffer = Encoding.UTF8.GetBytes(msg);
+            tcpConn.GetStream().Write(buffer, 0, buffer.Length);
+        }
+        catch (Exception e) { return false; }
+        return true;
+    }
+
+    public bool Read(string msgName)
+    {
+        DateTime start = DateTime.Now;
+        while ((DateTime.Now - start).TotalSeconds < 30)
+        {
+            for (int i = 0; i < messageQueue.Count; i++)
+            {
+                if (messageQueue[i].Key == msgName)
+                {
+                    messageQueue.RemoveAt(i);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public bool Read(out string[] msg, string msgName)
+    {
+        DateTime start = DateTime.Now;
+        while ((DateTime.Now - start).TotalSeconds < 30)
+        {
+            for (int i = 0; i < messageQueue.Count; i++)
+            {
+                try
+                {
+                    if (messageQueue[i].Key == msgName)
+                    {
+                        msg = new string[messageQueue[i].Value.Length];
+                        for (int j = 0; j < messageQueue[i].Value.Length; j++)
+                            msg[j] = messageQueue[i].Value[j];
+                        messageQueue.RemoveAt(i);
+                        return true;
+                    }
+                }
+                catch(Exception e) { Console.WriteLine(e); }
+            }
+        }
+        msg = new string[0];
+        return false;
+    }
+
+    void Listen()
+    {
+        while (tcpConn.Connected)
+        {
+            try
+            {
+                Byte[] buffer = new Byte[512];
+                int size = tcpConn.GetStream().Read(buffer, 0, buffer.Length);
+
+                string[] msg = Encoding.UTF8.GetString(buffer).Substring(0, size).Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+
+                if (msg.Length > 1)
+                    messageQueue.Add(new KeyValuePair<string, string[]>(msg[0], msg[1].Split('&')));
+                else messageQueue.Add(new KeyValuePair<string, string[]>(msg[0], new string[] { "" }));
+
+                /*
+                List<string> msgArr = new List<string>(0);
+                foreach(string s in Encoding.UTF8.GetString(buffer).Substring(0, size).Split('|'))
+                    msgArr.Add(s);
+
+                messageQueue.Add(msgArr.ToArray());
+                */
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                break;
+            }
+        }
     }
 }

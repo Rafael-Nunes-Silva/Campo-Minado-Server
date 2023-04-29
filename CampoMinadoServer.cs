@@ -7,9 +7,6 @@ using System.Net.Sockets;
 
 class Campo_Minado_Server
 {
-    public static readonly string SUCCESS_MSG = "SUCCESS";
-    public static readonly string FAILED_MSG = "FAILED";
-
     static int maxGameRooms = 4;
     static List<GameRoom> gameRooms = new List<GameRoom>(0);
 
@@ -55,38 +52,13 @@ class Campo_Minado_Server
             {
                 TcpClient tcpConn = listener.AcceptTcpClient();
 
-                Byte[] buffer = new Byte[128];
-                int size = tcpConn.GetStream().Read(buffer, 0, buffer.Length);
+                Player newPlayer = new Player(tcpConn);
 
-                string name = Encoding.UTF8.GetString(buffer).Substring(0, size);
+                Task.Run(new Action(() => { ManagePlayer(newPlayer); }));
 
-                Task.Run(new Action(() => { ManagePlayer(new Player(name, tcpConn)); }));
-
-                Console.WriteLine($"{name} conectou");
+                Console.WriteLine($"{newPlayer.GetName()} conectou");
             }
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
-            }
-            /* create room
-            try
-            {
-                TcpClient player = listener.AcceptTcpClient();
-
-                Byte[] buffer = new Byte[512];
-                int size = player.GetStream().Read(buffer, 0, 512);
-
-                string[] content = Encoding.UTF8.GetString(buffer).Substring(0, size).Split('|');
-
-                gameRooms.Add(new GameRoom(listener, player, content[0], int.Parse(content[1])));
-
-                Console.WriteLine($"Sala criada\nNome: {content[0]}\nMáximo de jogadores: {content[1]}");
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
-            }
-            */
+            catch (Exception e) { Console.WriteLine(e); }
         }
     }
 
@@ -96,45 +68,47 @@ class Campo_Minado_Server
         {
             try
             {
-                string[] content = player.Read().Split('|');
-
-                switch (content[0])
+                if(player.Read("DISCONNECT"))
                 {
-                    case "DISCONNECT":
-                        player.Disconnect();
-                        break;
-                    case "CONNECT":
-                        for (int i = 0; i < gameRooms.Count; i++)
+                    player.Disconnect();
+                    return;
+                }
+
+                string[] msgArr;
+                if (player.Read(out msgArr, "ENTER_ROOM"))
+                {
+                    for (int i = 0; i < gameRooms.Count; i++)
+                    {
+                        if (gameRooms[i].GetName() == msgArr[0])
                         {
-                            if (gameRooms[i].GetName() == content[1])
+                            if (!gameRooms[i].AddPlayer(player))
                             {
-                                if (!gameRooms[i].AddPlayer(player))
-                                {
-                                    player.Write(SUCCESS_MSG);
-                                    break;
-                                }
+                                player.Write("SUCCESS");
+                                return;
                             }
                         }
-                        player.Write(FAILED_MSG);
-                        break;
-                    case "CREATE_ROOM":
-                        GameRoom gameRoom = new GameRoom(content[1], int.Parse(content[2]));
+                    }
+                    player.Write("FAILED");
+                }
+                else if (player.Read(out msgArr, "CREATE_ROOM"))
+                {
+                    GameRoom gameRoom = new GameRoom(msgArr[0], int.Parse(msgArr[1]), (Difficulty)int.Parse(msgArr[2]));
 
-                        gameRooms.Add(gameRoom);
-                        // gameRooms.Add(new GameRoom(listener, player.connection, content[1], int.Parse(content[2])));
+                    gameRooms.Add(gameRoom);
+                    // gameRooms.Add(new GameRoom(listener, player.connection, content[1], int.Parse(content[2])));
 
-                        Task.Run(new Action(() => { ManageRoom(gameRoom); }));
+                    Task.Run(new Action(() => { ManageRoom(gameRoom); }));
 
-                        Console.WriteLine($"Sala criada por {player.GetName()}\nNome: {content[1]}\nMáximo de jogadores: {content[2]}");
+                    Console.WriteLine($"Sala criada por {player.GetName()}\nNome: {msgArr[0]}\nMáximo de jogadores: {msgArr[1]}\nDificuldade: {(Difficulty)int.Parse(msgArr[2])}");
 
-                        player.Write(SUCCESS_MSG);
-                        break;
-                    case "GET_ROOMS":
-                        string msg = "Salas:\nNome | Espaço\n";
-                        for (int i = 0; i < gameRooms.Count; i++)
-                            msg += $"{gameRooms[i].GetName()} | {gameRooms[i].GetPlayerCount()}/{gameRooms[i].GetMaxPlayers()}\n";
-                        player.Write(msg);
-                        break;
+                    player.Write("SUCCESS");
+                }
+                else if (player.Read("GET_ROOMS"))
+                {
+                    string msg = "Salas:\nNome, Espaço\n|";
+                    for (int i = 0; i < gameRooms.Count; i++)
+                        msg += $"{gameRooms[i].GetName()}, {gameRooms[i].GetPlayerCount()}/{gameRooms[i].GetMaxPlayers()}\n";
+                    player.Write(msg);
                 }
             }
             catch (Exception e)
@@ -144,13 +118,18 @@ class Campo_Minado_Server
             }
         }
     }
-
+    
     static void ManageRoom(GameRoom gameRoom)
     {
+        Console.WriteLine($"Sala {gameRoom.GetName()} aguardando jogadores...");
         while (!gameRoom.Full()) { }
+        Console.WriteLine($"Sala {gameRoom.GetName()} está cheia, aguardando jogadores");
 
+        while (!gameRoom.AllReady()) { }
 
-
+        Console.WriteLine($"Sala {gameRoom.GetName()} iniciou o jogo");
+        gameRoom.StartGame();
+        /*
         while (gameRoom.PlayersConnected() > 0)
         {
             for (int i = 0; i < gameRoom.players.Count; i++)
@@ -158,6 +137,7 @@ class Campo_Minado_Server
                 // gameRoom.players[i].Write($"CONNECTED|{gameRoom.GetName()}");
             }
         }
+        */
         Console.WriteLine($"A sala {gameRoom.GetName()} foi fechada");
     }
 }
