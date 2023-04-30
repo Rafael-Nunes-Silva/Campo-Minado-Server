@@ -8,14 +8,17 @@ using System.Net.Sockets;
 class Campo_Minado_Server
 {
     static int maxGameRooms = 4;
-    static List<GameRoom> gameRooms = new List<GameRoom>(0);
+    static Dictionary<string, GameRoom> gameRooms = new Dictionary<string, GameRoom>(0);
+    static List<Player> players = new List<Player>(0);
 
     static TcpListener listener;
+    static bool running = true;
 
     static void Main(string[] args)
     {
         int port = 6778;
 
+        /*
         Console.Write("Insira a porta: ");
         try { port = int.Parse(Console.ReadLine()); }
         catch (Exception e) { }
@@ -23,121 +26,157 @@ class Campo_Minado_Server
         Console.Write("Insira o número máximo de salas: ");
         try { maxGameRooms = int.Parse(Console.ReadLine()); }
         catch (Exception e) { }
+        */
 
         listener = new TcpListener(System.Net.IPAddress.Any, port);
 
         Task.Run(ListenForConnections);
 
-        bool running = true;
         while (running)
         {
-            switch (Console.ReadLine().ToLower())
-            {
-                case "-close_server":
-                    running = false;
-                    break;
-            }
-        }
+            Console.Clear();
 
-        for(int i=0; i<gameRooms.Count;i++)
-            gameRooms[i].Close();
-    }
+            Console.WriteLine("0 - Fechar servidor");
+            Console.WriteLine("1 - Mostrar salas");
+            Console.WriteLine("2 - Fechar sala");
+            Console.WriteLine("3 - Mostrar jogadores");
+            Console.WriteLine("4 - Desconectar jogador");
+            Console.Write(": ");
 
-    static void ListenForConnections()
-    {
-        listener.Start();
-        while (gameRooms.Count() < maxGameRooms)
-        {
             try
             {
-                TcpClient tcpConn = listener.AcceptTcpClient();
+                int input = int.Parse(Console.ReadLine());
+                string str = "";
 
-                Player newPlayer = new Player(tcpConn);
-
-                Task.Run(new Action(() => { ManagePlayer(newPlayer); }));
-
-                Console.WriteLine($"{newPlayer.GetName()} conectou");
-            }
-            catch (Exception e) { Console.WriteLine(e); }
-        }
-    }
-
-    static void ManagePlayer(Player player)
-    {
-        while (player.IsConnected())
-        {
-            try
-            {
-                if(player.Read("DISCONNECT"))
+                switch (input)
                 {
-                    player.Disconnect();
-                    return;
-                }
-                if (player.Read("GET_ROOMS"))
-                {
-                    string msg = "Salas:\nNome, Espaço\n";
-                    for (int i = 0; i < gameRooms.Count; i++)
-                        msg += $"{gameRooms[i].GetName()}, {gameRooms[i].GetPlayerCount()}/{gameRooms[i].GetMaxPlayers()}\n";
-                    player.Write("ROOMS", msg);
-                }
+                    case 0:
+                        running = false;
+                        break;
+                    case 1:
+                        ShowRooms();
+                        break;
+                    case 2:
+                        Console.Write("Insira o nome da sala: ");
+                        str = Console.ReadLine();
 
-                string[] msgArr;
-                if (player.Read(out msgArr, "ENTER_ROOM"))
-                {
-                    for (int i = 0; i < gameRooms.Count; i++)
-                    {
-                        if (gameRooms[i].GetName() == msgArr[0])
-                        {
-                            if (!gameRooms[i].AddPlayer(player))
-                            {
-                                player.Write("ENTER_ROOM_SUCCESS");
-                                return;
-                            }
-                        }
-                    }
-                }
-                if (player.Read(out msgArr, "CREATE_ROOM"))
-                {
-                    GameRoom gameRoom = new GameRoom(msgArr[0], int.Parse(msgArr[1]), (Difficulty)int.Parse(msgArr[2]));
+                        CloseRoom(str);
+                        break;
+                    case 3:
+                        ShowPlayers();
+                        break;
+                    case 4:
+                        Console.Write("Insira o nome do jogador: ");
+                        str = Console.ReadLine();
 
-                    gameRooms.Add(gameRoom);
-                    // gameRooms.Add(new GameRoom(listener, player.connection, content[1], int.Parse(content[2])));
-
-                    Task.Run(new Action(() => { ManageRoom(gameRoom); }));
-
-                    Console.WriteLine($"Sala criada por {player.GetName()}\nNome: {msgArr[0]}\nMáximo de jogadores: {msgArr[1]}\nDificuldade: {(Difficulty)int.Parse(msgArr[2])}");
-
-                    player.Write("CREATE_ROOM_SUCCESS");
+                        DisconnectPlayer(str);
+                        break;
                 }
             }
             catch (Exception e)
             {
                 Console.WriteLine(e);
-                Console.WriteLine($"{player.GetName()} desconectou");
-                break;
+                continue;
+            }
+        }
+
+        CloseRooms();
+        DisconnectPlayers();
+    }
+
+    static void ListenForConnections()
+    {
+        listener.Start();
+        while (running)
+        {
+            Player newPlayer;
+            try { newPlayer = new Player(listener.AcceptTcpClient()); }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                return;
+            }
+
+            players.Add(newPlayer);
+
+            newPlayer.Connector().WaitForMsg("DISCONNECT", (disconnect) =>
+            {
+                newPlayer.Disconnect();
+                players.Remove(newPlayer);
+            });
+            newPlayer.Connector().WaitForMsg("CREATE_ROOM", (roomData) =>
+            {
+                CreateRoom(roomData[0], int.Parse(roomData[1]), (Difficulty)int.Parse(roomData[2]));
+            }, false);
+            newPlayer.Connector().WaitForMsg("ENTER_ROOM", (roomName) =>
+            {
+                gameRooms[roomName[0]].AddPlayer(newPlayer);
+            }, false);
+        }
+    }
+
+    static void UpdatePlayers()
+    {
+        string msg = "Salas:\nNome, Vagas\n";
+        foreach (var room in gameRooms)
+            msg += $"{room.Key}, {room.Value.GetPlayerCount()}/{room.Value.GetMaxPlayerCount()}\n";
+
+        players.ForEach((player) => { player.Connector().Write("ROOMS", msg); });
+    }
+
+    static bool CreateRoom(string name, int playerCount, Difficulty difficulty)
+    {
+        if (gameRooms.ContainsKey(name))
+            return false;
+
+        gameRooms.Add(name, new GameRoom(playerCount, difficulty));
+
+        UpdatePlayers();
+        return true;
+    }
+
+    static void ShowRooms()
+    {
+        Console.WriteLine("Salas:");
+        foreach (var room in gameRooms)
+            Console.WriteLine(room.Key);
+    }
+
+    static void CloseRoom(string name)
+    {
+        gameRooms[name].Close();
+        gameRooms.Remove(name);
+    }
+
+    static void CloseRooms()
+    {
+        foreach (var room in gameRooms)
+            room.Value.Close();
+        gameRooms.Clear();
+    }
+
+    static void ShowPlayers()
+    {
+        Console.WriteLine("Jogadores:");
+        foreach (var player in players)
+            Console.WriteLine(player.GetName());
+    }
+
+    static void DisconnectPlayer(string name)
+    {
+        for (int i = 0; i < players.Count; i++)
+        {
+            if (players[i].GetName() == name)
+            {
+                players[i].Disconnect();
+                players.RemoveAt(i);
             }
         }
     }
-    
-    static void ManageRoom(GameRoom gameRoom)
+
+    static void DisconnectPlayers()
     {
-        Console.WriteLine($"Sala {gameRoom.GetName()} aguardando jogadores...");
-        while (!gameRoom.Full()) { }
-        Console.WriteLine($"Sala {gameRoom.GetName()} está cheia, aguardando jogadores");
-
-        while (!gameRoom.AllReady()) { }
-
-        Console.WriteLine($"Sala {gameRoom.GetName()} iniciou o jogo");
-        gameRoom.StartGame();
-        /*
-        while (gameRoom.PlayersConnected() > 0)
-        {
-            for (int i = 0; i < gameRoom.players.Count; i++)
-            {
-                // gameRoom.players[i].Write($"CONNECTED|{gameRoom.GetName()}");
-            }
-        }
-        */
-        Console.WriteLine($"A sala {gameRoom.GetName()} foi fechada");
+        players.ForEach((player) => { player.Disconnect(); });
+        players.Clear();
     }
 }
