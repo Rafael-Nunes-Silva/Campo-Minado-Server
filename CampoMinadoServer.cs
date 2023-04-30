@@ -83,14 +83,13 @@ class Campo_Minado_Server
                         {
                             if (!gameRooms[i].AddPlayer(player))
                             {
-                                player.Write("SUCCESS");
+                                player.Write("ENTER_ROOM_SUCCESS");
                                 return;
                             }
                         }
                     }
-                    player.Write("FAILED");
                 }
-                else if (player.Read(out msgArr, "CREATE_ROOM"))
+                if (player.Read(out msgArr, "CREATE_ROOM"))
                 {
                     GameRoom gameRoom = new GameRoom(msgArr[0], int.Parse(msgArr[1]), (Difficulty)int.Parse(msgArr[2]));
 
@@ -101,18 +100,19 @@ class Campo_Minado_Server
 
                     Console.WriteLine($"Sala criada por {player.GetName()}\nNome: {msgArr[0]}\nMáximo de jogadores: {msgArr[1]}\nDificuldade: {(Difficulty)int.Parse(msgArr[2])}");
 
-                    player.Write("SUCCESS");
+                    player.Write("CREATE_ROOM_SUCCESS");
                 }
-                else if (player.Read("GET_ROOMS"))
+                if (player.Read("GET_ROOMS"))
                 {
                     string msg = "Salas:\nNome, Espaço\n|";
                     for (int i = 0; i < gameRooms.Count; i++)
                         msg += $"{gameRooms[i].GetName()}, {gameRooms[i].GetPlayerCount()}/{gameRooms[i].GetMaxPlayers()}\n";
-                    player.Write(msg);
+                    player.Write("ROOMS", msg);
                 }
             }
             catch (Exception e)
             {
+                Console.WriteLine(e);
                 Console.WriteLine($"{player.GetName()} desconectou");
                 break;
             }
