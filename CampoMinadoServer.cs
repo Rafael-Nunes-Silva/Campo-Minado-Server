@@ -73,6 +73,13 @@ class Campo_Minado_Server
                     player.Disconnect();
                     return;
                 }
+                if (player.Read("GET_ROOMS"))
+                {
+                    string msg = "Salas:\nNome, Espaço\n";
+                    for (int i = 0; i < gameRooms.Count; i++)
+                        msg += $"{gameRooms[i].GetName()}, {gameRooms[i].GetPlayerCount()}/{gameRooms[i].GetMaxPlayers()}\n";
+                    player.Write("ROOMS", msg);
+                }
 
                 string[] msgArr;
                 if (player.Read(out msgArr, "ENTER_ROOM"))
@@ -101,13 +108,6 @@ class Campo_Minado_Server
                     Console.WriteLine($"Sala criada por {player.GetName()}\nNome: {msgArr[0]}\nMáximo de jogadores: {msgArr[1]}\nDificuldade: {(Difficulty)int.Parse(msgArr[2])}");
 
                     player.Write("CREATE_ROOM_SUCCESS");
-                }
-                if (player.Read("GET_ROOMS"))
-                {
-                    string msg = "Salas:\nNome, Espaço\n|";
-                    for (int i = 0; i < gameRooms.Count; i++)
-                        msg += $"{gameRooms[i].GetName()}, {gameRooms[i].GetPlayerCount()}/{gameRooms[i].GetMaxPlayers()}\n";
-                    player.Write("ROOMS", msg);
                 }
             }
             catch (Exception e)

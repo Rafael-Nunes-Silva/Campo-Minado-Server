@@ -72,6 +72,9 @@ public class GameRoom
         if (players.Count >= maxPlayers)
             return false;
         players.Add(player);
+
+        Task.Run(new Action(() => { ManagePlayer(player); }));
+
         Console.WriteLine($"{player.GetName()} conectou a sala {name}");
         return true;
     }
@@ -82,10 +85,17 @@ public class GameRoom
         {
             try
             {
-                if (player.Read("LEAVE_ROOM"))
+                if (player.Read("DICONNECT"))
                 {
                     player.Disconnect();
                     return;
+                }
+                if (player.Read("GET_PLAYERS"))
+                {
+                    string msg = "Jogadores:\nNome, Pronto\n";
+                    for (int i = 0; i < players.Count; i++)
+                        msg += $"{players[i].GetName()}, {(players[i].ready ? "Sim" : "Não")}\n";
+                    player.Write("PLAYERS", msg);
                 }
                 
                 string[] msgArr;
@@ -93,7 +103,7 @@ public class GameRoom
                 {
                     player.ready = bool.Parse(msgArr[0]);
                 }
-                else if (player.Read(out msgArr, "GAMESTATUS"))
+                if (player.Read(out msgArr, "GAMESTATUS"))
                 {
                     switch ((GameStatus)int.Parse(msgArr[0]))
                     {
@@ -108,6 +118,7 @@ public class GameRoom
             }
             catch (Exception e)
             {
+                Console.WriteLine(e);
                 Console.WriteLine($"{player.GetName()} desconectou");
                 break;
             }
@@ -126,6 +137,10 @@ public class GameRoom
 
     public void StartGame()
     {
-
+        foreach (Player player in players)
+        {
+            player.Write("STARTGAME");
+            player.Write("DIFFICULTY", ((int)difficulty).ToString());
+        }
     }
 }

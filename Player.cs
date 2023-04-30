@@ -17,9 +17,6 @@ public class Player
     {
         this.tcpConn = tcpConn;
         Task.Run(Listen);
-
-        if (Read(out string[] nameMsg, "NAME"))
-            name = nameMsg[0];
     }
 
     public void Disconnect()
@@ -34,21 +31,10 @@ public class Player
 
     public string GetName()
     {
+        if (Read(out string[] nameMsg, "NAME"))
+            name = nameMsg[0];
         return name;
     }
-
-    /*
-    public bool Write(string msg)
-    {
-        try
-        {
-            Byte[] buffer = Encoding.UTF8.GetBytes(msg);
-            tcpConn.GetStream().Write(buffer, 0, buffer.Length);
-        }
-        catch (Exception e) { return false; }
-        return true;
-    }
-    //*/
 
     public bool Write(params string[] msgParts)
     {
@@ -77,6 +63,7 @@ public class Player
         {
             if (messageQueue[i].Key == msgName)
             {
+                Console.WriteLine("*** " + msgName + " ***");
                 messageQueue.RemoveAt(i);
                 return true;
             }
@@ -118,13 +105,6 @@ public class Player
                         messageQueue.Add(new KeyValuePair<string, string[]>(msg[0], msg[1].Split('&')));
                     else messageQueue.Add(new KeyValuePair<string, string[]>(msg[0], new string[] { "" }));
                 }
-                /*
-                List<string> msgArr = new List<string>(0);
-                foreach(string s in Encoding.UTF8.GetString(buffer).Substring(0, size).Split('|'))
-                    msgArr.Add(s);
-
-                messageQueue.Add(msgArr.ToArray());
-                */
             }
             catch (Exception e)
             {
