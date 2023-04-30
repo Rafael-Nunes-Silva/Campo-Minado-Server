@@ -30,6 +30,8 @@ public class GameRoom
     {
         this.maxPlayerCount = playerCount;
         this.difficulty = difficulty;
+
+        Task.Run(ManageGame);
     }
 
     public void Close()
@@ -59,6 +61,11 @@ public class GameRoom
         return players.Count;
     }
 
+    public bool HasPlayer(Player player)
+    {
+        return players.Contains(player);
+    }
+
     public bool AddPlayer(Player player)
     {
         if (players.Count >= maxPlayerCount)
@@ -83,16 +90,21 @@ public class GameRoom
         return true;
     }
 
+    public void RemovePlayer(Player player)
+    {
+        players.Remove(player);
+        UpdatePlayers();
+    }
+
     void UpdatePlayers()
     {
         string msg = "Jogadores:\nNome, Pronto\n";
-        foreach (var player in players)
-            msg += $"{player.GetName()}, {(player.IsReady() ? "Sim" : "Não")}\n";
+        players.ForEach((player) => { msg += $"{player.GetName()}, {player.IsReady()}\n"; });
 
         players.ForEach((player) => { player.Connector().Write("PLAYERS", msg); });
     }
 
-    public bool AllReady()
+    bool AllReady()
     {
         foreach (Player player in players)
         {
@@ -102,12 +114,27 @@ public class GameRoom
         return true;
     }
 
-    public void StartGame()
+    void StartGame()
     {
-        foreach (Player player in players)
+        players.ForEach((player) =>
         {
             player.Connector().Write("STARTGAME");
             player.Connector().Write("DIFFICULTY", ((int)difficulty).ToString());
+
+            player.Connector().WaitForMsg("GAMESTATE", (status) => { Console.WriteLine((GameStatus)int.Parse(status[0])); });
+        });
+    }
+
+    void ManageGame()
+    {
+        while (players.Count > 0)
+        {
+            Console.WriteLine("Sala esperando");
+            while (!AllReady()) { UpdatePlayers(); }
+            Console.WriteLine("Todos prontos, iniciando jogo");
+
+            StartGame();
         }
+        Close();
     }
 }

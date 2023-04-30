@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Net.Sockets;
 
@@ -9,6 +10,7 @@ public class Connector
 {
     TcpClient tcpConn;
     List<KeyValuePair<string, string[]>> messageQueue = new List<KeyValuePair<string, string[]>>(0);
+    Mutex messageQueueMut = new Mutex();
 
     public Connector(TcpClient tcpConn)
     {
@@ -58,33 +60,27 @@ public class Connector
         }
     }
 
-    /*
-    bool Read(string msgName)
-    {
-        for (int i = 0; i < messageQueue.Count; i++)
-        {
-            if (messageQueue[i].Key == msgName)
-            {
-                messageQueue.RemoveAt(i);
-                return true;
-            }
-        }
-        return false;
-    }
-    */
-
     bool Read(out string[] msg, string msgName)
     {
-        for (int i = 0; i < messageQueue.Count; i++)
+        if (messageQueueMut.WaitOne())
         {
-            if (messageQueue[i].Key == msgName)
+            for (int i = 0; i < messageQueue.Count; i++)
             {
-                msg = new string[messageQueue[i].Value.Length];
-                for (int j = 0; j < messageQueue[i].Value.Length; j++)
-                    msg[j] = messageQueue[i].Value[j];
-                messageQueue.RemoveAt(i);
-                return true;
+                try
+                {
+                    if (messageQueue[i].Key == msgName)
+                    {
+                        msg = new string[messageQueue[i].Value.Length];
+                        for (int j = 0; j < messageQueue[i].Value.Length; j++)
+                            msg[j] = messageQueue[i].Value[j];
+                        messageQueue.RemoveAt(i);
+                        messageQueueMut.ReleaseMutex();
+                        return true;
+                    }
+                }
+                catch (Exception e) { break; }
             }
+            messageQueueMut.ReleaseMutex();
         }
         msg = new string[0];
         return false;
@@ -110,10 +106,15 @@ public class Connector
             {
                 string[] msg = receivedMsg.Split('?');
 
-                if (msg.Length > 1)
-                    messageQueue.Add(new KeyValuePair<string, string[]>(msg[0], msg[1].Split('&')));
-                else messageQueue.Add(new KeyValuePair<string, string[]>(msg[0], new string[] { "" }));
+                if (messageQueueMut.WaitOne())
+                {
+                    if (msg.Length > 1)
+                        messageQueue.Add(new KeyValuePair<string, string[]>(msg[0], msg[1].Split('&')));
+                    else messageQueue.Add(new KeyValuePair<string, string[]>(msg[0], new string[] { "" }));
+                    messageQueueMut.ReleaseMutex();
+                }
             }
+            Thread.Sleep(1000);
         }
     }
 }

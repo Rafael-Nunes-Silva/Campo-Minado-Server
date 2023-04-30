@@ -34,7 +34,7 @@ class Campo_Minado_Server
 
         while (running)
         {
-            Console.Clear();
+            // Console.Clear();
 
             Console.WriteLine("0 - Fechar servidor");
             Console.WriteLine("1 - Mostrar salas");
@@ -106,11 +106,25 @@ class Campo_Minado_Server
             });
             newPlayer.Connector().WaitForMsg("CREATE_ROOM", (roomData) =>
             {
-                CreateRoom(roomData[0], int.Parse(roomData[1]), (Difficulty)int.Parse(roomData[2]));
+                if (CreateRoom(roomData[0], int.Parse(roomData[1]), (Difficulty)int.Parse(roomData[2])))
+                    newPlayer.Connector().Write("CREATE_ROOM_SUCCESS");
+                UpdatePlayers();
             }, false);
             newPlayer.Connector().WaitForMsg("ENTER_ROOM", (roomName) =>
             {
-                gameRooms[roomName[0]].AddPlayer(newPlayer);
+                if (gameRooms.ContainsKey(roomName[0]))
+                {
+                    if (gameRooms[roomName[0]].AddPlayer(newPlayer))
+                        newPlayer.Connector().Write("ENTER_ROOM_SUCCESS");
+                }
+            }, false);
+            newPlayer.Connector().WaitForMsg("LEAVE_ROOM", (roomName) =>
+            {
+                foreach(var room in gameRooms)
+                {
+                    if (room.Value.HasPlayer(newPlayer))
+                        room.Value.RemovePlayer(newPlayer);
+                }
             }, false);
         }
     }

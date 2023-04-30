@@ -10,7 +10,7 @@ public class Player
     TcpClient tcpConn;
     Connector connector;
 
-    string name;
+    string name = "UNKNOWN";
     bool ready = false;
 
     public Player(TcpClient tcpConn)
