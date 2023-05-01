@@ -68,8 +68,9 @@ public class GameRoom
 
     public bool AddPlayer(Player player)
     {
-        if (players.Count >= maxPlayerCount)
+        if (players.Count >= maxPlayerCount || HasPlayer(player))
             return false;
+
         players.Add(player);
 
         player.Connector().WaitForMsg("GAMESTATUS", (gameStatus) =>
@@ -84,8 +85,13 @@ public class GameRoom
                     break;
             }
         }, false);
+        player.Connector().WaitForMsg("GET_PLAYERS", (playersData) =>
+        {
+            string msg = "Jogadores:\nNome, Pronto\n";
+            players.ForEach((p) => { msg += $"{p.GetName()}, {(p.IsReady() ? "Sim" : "Não")}\n"; });
 
-        UpdatePlayers();
+            player.Connector().Write("PLAYERS", msg);
+        }, false);
 
         return true;
     }
@@ -93,15 +99,6 @@ public class GameRoom
     public void RemovePlayer(Player player)
     {
         players.Remove(player);
-        UpdatePlayers();
-    }
-
-    void UpdatePlayers()
-    {
-        string msg = "Jogadores:\nNome, Pronto\n";
-        players.ForEach((player) => { msg += $"{player.GetName()}, {player.IsReady()}\n"; });
-
-        players.ForEach((player) => { player.Connector().Write("PLAYERS", msg); });
     }
 
     bool AllReady()
@@ -130,7 +127,7 @@ public class GameRoom
         while (players.Count > 0)
         {
             Console.WriteLine("Sala esperando");
-            while (!AllReady()) { UpdatePlayers(); }
+            while (!AllReady()) { }
             Console.WriteLine("Todos prontos, iniciando jogo");
 
             StartGame();

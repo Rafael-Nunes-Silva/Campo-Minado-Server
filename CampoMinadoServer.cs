@@ -108,7 +108,6 @@ class Campo_Minado_Server
             {
                 if (CreateRoom(roomData[0], int.Parse(roomData[1]), (Difficulty)int.Parse(roomData[2])))
                     newPlayer.Connector().Write("CREATE_ROOM_SUCCESS");
-                UpdatePlayers();
             }, false);
             newPlayer.Connector().WaitForMsg("ENTER_ROOM", (roomName) =>
             {
@@ -120,22 +119,20 @@ class Campo_Minado_Server
             }, false);
             newPlayer.Connector().WaitForMsg("LEAVE_ROOM", (roomName) =>
             {
-                foreach(var room in gameRooms)
+                foreach (var room in gameRooms)
                 {
                     if (room.Value.HasPlayer(newPlayer))
                         room.Value.RemovePlayer(newPlayer);
                 }
             }, false);
+            newPlayer.Connector().WaitForMsg("GET_ROOMS", (none) =>
+            {
+                string msg = "Salas:\nNome, Vagas\n";
+                foreach (var room in gameRooms)
+                    msg += $"{room.Key}, {room.Value.GetPlayerCount()}/{room.Value.GetMaxPlayerCount()}\n";
+                newPlayer.Connector().Write("ROOMS", msg);
+            }, false);
         }
-    }
-
-    static void UpdatePlayers()
-    {
-        string msg = "Salas:\nNome, Vagas\n";
-        foreach (var room in gameRooms)
-            msg += $"{room.Key}, {room.Value.GetPlayerCount()}/{room.Value.GetMaxPlayerCount()}\n";
-
-        players.ForEach((player) => { player.Connector().Write("ROOMS", msg); });
     }
 
     static bool CreateRoom(string name, int playerCount, Difficulty difficulty)
@@ -144,8 +141,6 @@ class Campo_Minado_Server
             return false;
 
         gameRooms.Add(name, new GameRoom(playerCount, difficulty));
-
-        UpdatePlayers();
         return true;
     }
 
