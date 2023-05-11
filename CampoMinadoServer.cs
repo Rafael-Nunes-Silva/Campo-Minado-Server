@@ -25,8 +25,7 @@ class Campo_Minado_Server
     static readonly Dictionary<string, Action<Player, string[]>> expectedMessages = new Dictionary<string, Action<Player, string[]>>
     {
         { "NAME", (p, c) => { p.name = c[0]; } },
-        { "GET_ROOMS", (p, c) =>
-        {
+        { "GET_ROOMS", (p, c) => {
             string retMsg = "Salas:\nnome, lugares\n";
             lock(gameRoomsLock)
             {
@@ -89,14 +88,16 @@ class Campo_Minado_Server
     static void StartUp()
     {
         int port = 6778;
-
+        
+        //*
         Console.Write("Insira a porta: ");
         try { port = int.Parse(Console.ReadLine()); }
-        catch (Exception e) { }
+        catch (Exception e) { Console.WriteLine(e); }
 
         Console.Write("Insira o número máximo de salas: ");
         try { maxGameRooms = int.Parse(Console.ReadLine()); }
-        catch (Exception e) { }
+        catch (Exception e) { Console.WriteLine(e); }
+        //*/
 
         listener = new TcpListener(System.Net.IPAddress.Any, port);
         listener.Start();
