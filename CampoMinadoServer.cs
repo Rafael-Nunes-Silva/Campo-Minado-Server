@@ -41,14 +41,20 @@ class Campo_Minado_Server
         {
             lock (gameRoomsLock)
             {
-                gameRooms.ForEach((room) =>
+                for (int i = 0; i < gameRooms.Count; i++)
                 {
-                    if (room.shouldClose)
-                        gameRooms.Remove(room);
-                });
+                    if (gameRooms[i].shouldClose)
+                    {
+                        Console.WriteLine($"A sala {gameRooms[i].GetName()} foi fechada");
+                        gameRooms.Remove(gameRooms[i]);
+                        i--;
+                    }
+                }
             }
             Thread.Sleep(10000);
         }
+
+        listener.Stop();
     }
 
     static void StartUp()
@@ -68,7 +74,6 @@ class Campo_Minado_Server
         listener = new TcpListener(System.Net.IPAddress.Any, port);
         listener.Start();
         Task.Run(ReceivePlayer);
-        listener.Stop();
     }
 
     static bool StayOpen()
