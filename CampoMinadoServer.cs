@@ -39,7 +39,15 @@ class Campo_Minado_Server
 
         while (StayOpen())
         {
-            ReceivePlayer();
+            lock (gameRoomsLock)
+            {
+                gameRooms.ForEach((room) =>
+                {
+                    if (room.shouldClose)
+                        gameRooms.Remove(room);
+                });
+            }
+            Thread.Sleep(10000);
         }
     }
 
@@ -59,6 +67,8 @@ class Campo_Minado_Server
 
         listener = new TcpListener(System.Net.IPAddress.Any, port);
         listener.Start();
+        Task.Run(ReceivePlayer);
+        listener.Stop();
     }
 
     static bool StayOpen()
@@ -68,47 +78,50 @@ class Campo_Minado_Server
 
     static void ReceivePlayer()
     {
-        Player newPlayer = null;
-        try { newPlayer = new Player(listener.AcceptTcpClient()); }
-        catch (Exception e)
+        while (true)
         {
-            Console.WriteLine(e);
-            return;
-        }
-
-        lock (playersLock)
-        {
-            players.Add(newPlayer);
-        }
-
-        newPlayer.WaitForMsg("GET_ROOMS", (content) =>
-        {
-            string retMsg = "Salas:\nnome, lugares\n";
-            lock (gameRoomsLock)
+            Player newPlayer = null;
+            try { newPlayer = new Player(listener.AcceptTcpClient()); }
+            catch (Exception e)
             {
-                gameRooms.ForEach((gameRoom) => { retMsg += $"{gameRoom.GetName()}, {gameRoom.GetPlayerCount()}/{gameRoom.GetPlayerLimit()}\n"; });
-            }
-            newPlayer.Write("ROOMS", retMsg);
-        }, true);
-        newPlayer.WaitForMsg("CREATE_ROOM", (content) =>
-        {
-            if (RoomExists(content[0]))
+                Console.WriteLine(e);
                 return;
+            }
 
-            lock (gameRoomsLock)
+            lock (playersLock)
             {
-                gameRooms.Add(new GameRoom(content[0], int.Parse(content[1]), (Difficulty)int.Parse(content[2])));
+                players.Add(newPlayer);
             }
-            newPlayer.Write("CREATE_ROOM_SUCCESS");
-        }, true);
-        newPlayer.WaitForMsg("ENTER_ROOM", (content) =>
-        {
-            if (!RoomExists(content[0]))
-                return;
 
-            if (FindRoomByName(content[0]).AddPlayer(newPlayer))
-                newPlayer.Write("ENTER_ROOM_SUCCESS");
-        }, true);
+            newPlayer.WaitForMsg("GET_ROOMS", (content) =>
+            {
+                string retMsg = "Salas:\nnome, lugares\n";
+                lock (gameRoomsLock)
+                {
+                    gameRooms.ForEach((gameRoom) => { retMsg += $"{gameRoom.GetName()}, {gameRoom.GetPlayerCount()}/{gameRoom.GetPlayerLimit()}\n"; });
+                }
+                newPlayer.Write("ROOMS", retMsg);
+            }, true);
+            newPlayer.WaitForMsg("CREATE_ROOM", (content) =>
+            {
+                if (RoomExists(content[0]))
+                    return;
+
+                lock (gameRoomsLock)
+                {
+                    gameRooms.Add(new GameRoom(content[0], int.Parse(content[1]), (Difficulty)int.Parse(content[2])));
+                }
+                newPlayer.Write("CREATE_ROOM_SUCCESS");
+            }, true);
+            newPlayer.WaitForMsg("ENTER_ROOM", (content) =>
+            {
+                if (!RoomExists(content[0]))
+                    return;
+
+                if (FindRoomByName(content[0]).AddPlayer(newPlayer))
+                    newPlayer.Write("ENTER_ROOM_SUCCESS");
+            }, true);
+        }
     }
 
     static bool RoomExists(string roomName)

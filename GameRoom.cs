@@ -15,7 +15,7 @@ public class GameRoom
     Object playersLock = new Object();
     GameStatus gameStatus = GameStatus.NOT_PLAYING;
 
-    bool shouldClose = false;
+    public bool shouldClose = false;
 
     public GameRoom(string name, int playerCount, Difficulty difficulty)
     {
@@ -35,10 +35,13 @@ public class GameRoom
 
     public bool HasPlayer(Player player)
     {
-        for(int i = 0; i < players.Count; i++)
+        lock (playersLock)
         {
-            if (players[i] == player)
-                return true;
+            for (int i = 0; i < players.Count; i++)
+            {
+                if (players[i] == player)
+                    return true;
+            }
         }
         return false;
     }
@@ -49,10 +52,13 @@ public class GameRoom
         {
             if (players.Count >= maxPlayerCount)
                 return false;
+        }
 
-            if (HasPlayer(player))
-                return false;
+        if (HasPlayer(player))
+            return false;
 
+        lock (playersLock)
+        {
             players.Add(player);
         }
 
@@ -60,7 +66,11 @@ public class GameRoom
         {
             lock (playersLock)
             {
+                player.ready = false;
+                player.status = GameStatus.NOT_PLAYING;
                 players.Remove(player);
+                if (players.Count == 0)
+                    shouldClose = true;
             }
         });
         player.WaitForMsg("GET_PLAYERS", (content) =>
@@ -110,7 +120,7 @@ public class GameRoom
 
     public void RunGame()
     {
-        while (true)
+        while (!shouldClose)
         {
             switch (gameStatus)
             {
