@@ -7,23 +7,12 @@ using System.Net.Sockets;
 
 public class GameRoom
 {
-    static readonly Dictionary<string, Action<Player, string[]>> expectedMessages = new Dictionary<string, Action<Player, string[]>>
-    {
-        { "GET_PLAYERS", (p, c) => {
-            string retMsg = "Players:\nNome, Pronto\n";
-            players.ForEach((player) => { retMsg += $"{player.name}, {(player.ready ? "Sim" : "Não")}\n"; });
-            p.Write("PLAYERS", retMsg);
-        } },
-        { "GAMESTATUS", (p, c) => {
-            Console.WriteLine($"{p.name}: {(GameStatus)int.Parse(c[0])}");
-        } }
-    }; // new Dictionary<string, Action<Player>>(0);
-
     string name;
     int maxPlayerCount;
     Difficulty difficulty;
 
-    public List<Player> players = new List<Player>(0);
+    List<Player> players = new List<Player>(0);
+    Object playersLock = new Object();
     GameStatus gameStatus = GameStatus.NOT_PLAYING;
 
     bool shouldClose = false;
@@ -33,6 +22,10 @@ public class GameRoom
         this.name = name;
         this.maxPlayerCount = playerCount;
         this.difficulty = difficulty;
+
+        Task.Run(RunGame);
+
+        Console.WriteLine($"Sala {name} aberta");
     }
 
     public string GetName()
@@ -40,12 +33,49 @@ public class GameRoom
         return name;
     }
 
+    public bool HasPlayer(Player player)
+    {
+        for(int i = 0; i < players.Count; i++)
+        {
+            if (players[i] == player)
+                return true;
+        }
+        return false;
+    }
+
     public bool AddPlayer(Player player)
     {
-        if (players.Count >= maxPlayerCount)
-            return false;
+        lock (playersLock)
+        {
+            if (players.Count >= maxPlayerCount)
+                return false;
 
-        players.Add(player);
+            if (HasPlayer(player))
+                return false;
+
+            players.Add(player);
+        }
+
+        player.WaitForMsg("LEAVE_ROOM", (content) =>
+        {
+            lock (playersLock)
+            {
+                players.Remove(player);
+            }
+        });
+        player.WaitForMsg("GET_PLAYERS", (content) =>
+        {
+            string retMsg = "Players:\nNome, Pronto\n";
+            lock (playersLock)
+            {
+                players.ForEach((p) => { retMsg += $"{p.name}, {(p.ready ? "Sim" : "Não")}\n"; });
+            }
+            player.Write("PLAYERS", retMsg);
+        }, true);
+        player.WaitForMsg("GAMESTATUS", (content) =>
+        {
+            Console.WriteLine($"{player.name}: {(GameStatus)int.Parse(content[0])}");
+        }, true);
 
         return true;
     }
@@ -56,14 +86,19 @@ public class GameRoom
             players = new List<Player>(0);
             return false;
         }
-
-        players = this.players;
+        lock (playersLock)
+        {
+            players = this.players;
+        }
         return true;
     }
 
     public int GetPlayerCount()
     {
-        return players.Count;
+        lock (playersLock)
+        {
+            return players.Count;
+        }
     }
 
     public int GetPlayerLimit()
@@ -73,47 +108,48 @@ public class GameRoom
 
     public void RunGame()
     {
-        players.ForEach((player) => { ManagePlayer(player); });
-        switch (gameStatus)
+        while (true)
         {
-            case GameStatus.NOT_PLAYING:
-                if (AllReady())
-                {
-                    gameStatus = GameStatus.PLAYING;
-                    Console.WriteLine($"Sala {name} iniciando jogo");
-                }
-                break;
-            case GameStatus.PLAYING:
+            switch (gameStatus)
+            {
+                case GameStatus.NOT_PLAYING:
+                    lock (playersLock)
+                    {
+                        if (players.Count == maxPlayerCount && AllReady())
+                        {
+                            Console.WriteLine($"Sala {name} iniciando jogo");
 
-                break;
-            case GameStatus.WON:
+                            gameStatus = GameStatus.PLAYING;
+                            players.ForEach((player) =>
+                            {
+                                player.Write("STARTGAME", ((int)difficulty).ToString(), DateTime.Now.Millisecond.ToString());
+                            });
+                        }
+                    }
+                    break;
+                case GameStatus.PLAYING:
 
-                break;
-            case GameStatus.LOST:
+                    break;
+                case GameStatus.WON:
 
-                break;
+                    break;
+                case GameStatus.LOST:
+
+                    break;
+            }
         }
     }
 
     bool AllReady()
     {
-        for (int i = 0; i < players.Count; i++)
+        lock (playersLock)
         {
-            if (!players[i].ready)
-                return false;
+            for (int i = 0; i < players.Count; i++)
+            {
+                if (!players[i].ready)
+                    return false;
+            }
         }
-
         return true;
-    }
-
-    void ManagePlayer(Player player)
-    {
-        player.Receive();
-
-        foreach (var expectedMsg in expectedMessages)
-        {
-            if (player.TryGetMessage(expectedMsg.Key, out string[] content))
-                expectedMsg.Value(player, content);
-        }
     }
 }

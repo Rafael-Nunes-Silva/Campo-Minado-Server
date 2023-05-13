@@ -2,46 +2,15 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Net.Sockets;
-
-public class Msg
-{
-    string ownerName, msgName;
-    string[] content;
-
-    public Msg(string ownerName, string msgName, string[] content)
-    {
-        this.ownerName = ownerName;
-        this.msgName = msgName;
-        this.content = content;
-    }
-
-    public string GetOwner()
-    {
-        return ownerName;
-    }
-
-    public string GetName()
-    {
-        return msgName;
-    }
-
-    public void SetContent(string[] content)
-    {
-        this.content = content;
-    }
-    public string[] GetContent()
-    {
-        return content;
-    }
-}
 
 public class Player
 {
     TcpClient tcpConn;
-    List<Msg> messageQueue = new List<Msg>(0);
-    // Dictionary<string, string[]> messageQueue = new Dictionary<string, string[]>(0);
+    Dictionary<string, string[]> messageQueue = new Dictionary<string, string[]>(0);
+    Object messageQueueLock = new Object();
 
     public string name = "UNKNOWN";
     public bool ready = false;
@@ -50,7 +19,10 @@ public class Player
     {
         this.tcpConn = tcpConn;
 
+        Task.Run(Listen);
 
+        WaitForMsg("NAME", (content) => { name = content[0]; });
+        WaitForMsg("READY", (content) => { ready = bool.Parse(content[0]); }, true);
     }
 
     public void Disconnect()
@@ -58,26 +30,25 @@ public class Player
         tcpConn.Close();
     }
 
-    bool QueueHasMessage(string msgName)
+    public bool IsConnected()
     {
-        for (int i = 0; i < messageQueue.Count; i++)
-        {
-            if (messageQueue[i].GetName() == msgName)
-                return true;
-        }
-
-        return false;
+        return tcpConn.Connected;
     }
 
-    Msg FindMessageByName(string msgName)
+    public void WaitForMsg(string msgName, Action<string[]> receiveCallback, bool repeat = false)
     {
-        for (int i = 0; i < messageQueue.Count; i++)
+        Task.Run(() =>
         {
-            if (messageQueue[i].GetName() == msgName)
-                return messageQueue[i];
-        }
-
-        return null;
+            while (tcpConn.Connected)
+            {
+                if (Read(msgName, out string[] strArr))
+                {
+                    receiveCallback(strArr);
+                    if (!repeat)
+                        break;
+                }
+            }
+        });
     }
 
     public bool Write(params string[] msgParts)
@@ -90,7 +61,7 @@ public class Player
                 msg += $"{msgParts[i]}{(i < msgParts.Length - 1 ? "&" : "")}";
             msg += "|";
         }
-        else msg = $"|{name}?{msgParts[0]}|";
+        else msg = $"|{msgParts[0]}|";
 
         try
         {
@@ -105,48 +76,70 @@ public class Player
         }
     }
 
-    public void Receive()
+    public bool Read(string msgName, int maxWaitTime = 10000)
     {
-        string receivedStr = "";
-        try
+        DateTime start = DateTime.Now;
+        do
         {
-            Byte[] buffer = new Byte[4096];
-            int len = tcpConn.GetStream().Read(buffer, 0, buffer.Length);
-            receivedStr = Encoding.UTF8.GetString(buffer).Substring(0, len);
-        }
-        catch (Exception e) { Console.WriteLine(e); }
-
-        foreach (string msg in receivedStr.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries))
-        {
-            string[] splitMsg = msg.Split('?');
-
-            string senderName = splitMsg[0],
-                msgName = splitMsg[1];
-            string[] msgContent = (splitMsg.Length > 2 ? splitMsg[2].Split('&') : new string[] { "" });
-
-            if (QueueHasMessage(msgName))
-                FindMessageByName(msgName).SetContent(msgContent);
-            else messageQueue.Add(new Msg(senderName, msgName, msgContent));
-
-            /*
-            if (messageQueue.ContainsKey(msgName))
-                messageQueue[msgName] = msgContent;
-            else messageQueue.Add(msgName, msgContent);
-            */
-        }
+            lock (messageQueueLock)
+            {
+                if (messageQueue.ContainsKey(msgName))
+                {
+                    messageQueue.Remove(msgName);
+                    return true;
+                }
+            }
+            Thread.Sleep(100);
+        } while ((DateTime.Now - start).TotalMilliseconds < maxWaitTime);
+        return false;
     }
 
-    public bool TryGetMessage(string msgName, out string[] content)
+    public bool Read(string msgName, out string[] content, int maxWaitTime = 10000)
     {
-        if (!QueueHasMessage(msgName))
+        DateTime start = DateTime.Now;
+        do
         {
-            content = new string[] { "" };
-            return false;
-        }
+            lock (messageQueueLock)
+            {
+                if (messageQueue.ContainsKey(msgName))
+                {
+                    content = messageQueue[msgName];
+                    messageQueue.Remove(msgName);
+                    return true;
+                }
+            }
+            Thread.Sleep(100);
+        } while ((DateTime.Now - start).TotalMilliseconds < maxWaitTime);
+        content = new string[0];
+        return false;
+    }
 
-        Msg msg = FindMessageByName(msgName);
-        content = msg.GetContent();
-        messageQueue.Remove(msg);
-        return true;
+    void Listen()
+    {
+        while (tcpConn.Connected)
+        {
+            Byte[] buffer = new Byte[4096];
+            int size;
+            try { size = tcpConn.GetStream().Read(buffer, 0, buffer.Length); }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                break;
+            }
+
+            foreach (string receivedMsg in Encoding.UTF8.GetString(buffer).Substring(0, size).Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                string[] msg = receivedMsg.Split('?');
+
+                lock (messageQueueLock)
+                {
+                    if (messageQueue.ContainsKey(msg[0]))
+                        messageQueue[msg[0]] = (msg.Length > 1 ? msg[1].Split('&') : new string[] { "" });
+                    else messageQueue.Add(msg[0], (msg.Length > 1 ? msg[1].Split('&') : new string[] { "" }));
+                }
+            }
+
+            // Thread.Sleep(100);
+        }
     }
 }
