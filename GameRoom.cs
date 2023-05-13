@@ -67,6 +67,8 @@ public class GameRoom
             {
                 player.ready = false;
                 player.status = GameStatus.NOT_PLAYING;
+                player.statusStr = "";
+
                 players.Remove(player);
                 if (players.Count == 0)
                     shouldClose = true;

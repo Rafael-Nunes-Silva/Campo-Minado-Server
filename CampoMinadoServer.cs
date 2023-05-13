@@ -61,7 +61,6 @@ class Campo_Minado_Server
     {
         int port = 6778;
         
-        /*
         Console.Write("Insira a porta: ");
         try { port = int.Parse(Console.ReadLine()); }
         catch (Exception e) { Console.WriteLine(e); }
@@ -69,7 +68,6 @@ class Campo_Minado_Server
         Console.Write("Insira o número máximo de salas: ");
         try { maxGameRooms = int.Parse(Console.ReadLine()); }
         catch (Exception e) { Console.WriteLine(e); }
-        //*/
 
         listener = new TcpListener(System.Net.IPAddress.Any, port);
         listener.Start();
