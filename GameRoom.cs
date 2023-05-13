@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.Net.Sockets;
 
 public class GameRoom
 {
@@ -25,7 +24,7 @@ public class GameRoom
 
         Task.Run(RunGame);
 
-        Console.WriteLine($"Sala {name} aberta");
+        Console.WriteLine($"A sala {name} foi aberta");
     }
 
     public string GetName()
@@ -96,7 +95,7 @@ public class GameRoom
                             status = "Perdeu";
                             break;
                     }
-                    retMsg += $"{p.name}, {(p.ready ? "Sim" : "Não")}, {status}\n";
+                    retMsg += $"{p.name}, {(p.ready ? "Sim" : "Não")}, {status} - {p.statusStr}\n";
                 });
             }
             player.Write("PLAYERS", retMsg);
@@ -141,7 +140,8 @@ public class GameRoom
                     }
                     break;
                 case GameStatus.PLAYING:
-
+                    if (NoneReady())
+                        gameStatus = GameStatus.NOT_PLAYING;
                     break;
                 case GameStatus.WON:
 
@@ -151,6 +151,19 @@ public class GameRoom
                     break;
             }
         }
+    }
+
+    bool NoneReady()
+    {
+        lock (playersLock)
+        {
+            for (int i = 0; i < players.Count; i++)
+            {
+                if (players[i].ready)
+                    return false;
+            }
+        }
+        return true;
     }
 
     bool AllReady()
