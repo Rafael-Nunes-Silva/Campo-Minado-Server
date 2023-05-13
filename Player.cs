@@ -14,6 +14,7 @@ public class Player
 
     public string name = "UNKNOWN";
     public bool ready = false;
+    public GameStatus status = GameStatus.NOT_PLAYING;
 
     public Player(TcpClient tcpConn)
     {
@@ -23,6 +24,7 @@ public class Player
 
         WaitForMsg("NAME", (content) => { name = content[0]; });
         WaitForMsg("READY", (content) => { ready = bool.Parse(content[0]); }, true);
+        WaitForMsg("GAMESTATUS", (content) => { status = (GameStatus)int.Parse(content[0]); }, true);
     }
 
     public void Disconnect()

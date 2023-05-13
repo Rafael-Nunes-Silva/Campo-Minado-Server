@@ -65,31 +65,33 @@ public class GameRoom
         });
         player.WaitForMsg("GET_PLAYERS", (content) =>
         {
-            string retMsg = "Players:\nNome, Pronto\n";
+            string retMsg = "Players:\nNome, Pronto, Status\n";
             lock (playersLock)
             {
-                players.ForEach((p) => { retMsg += $"{p.name}, {(p.ready ? "Sim" : "Não")}\n"; });
+                players.ForEach((p) =>
+                {
+                    string status = "";
+                    switch (p.status)
+                    {
+                        case GameStatus.NOT_PLAYING:
+                            status = "Esperando";
+                            break;
+                        case GameStatus.PLAYING:
+                            status = "Jogando";
+                            break;
+                        case GameStatus.WON:
+                            status = "Ganhou";
+                            break;
+                        case GameStatus.LOST:
+                            status = "Perdeu";
+                            break;
+                    }
+                    retMsg += $"{p.name}, {(p.ready ? "Sim" : "Não")}, {status}\n";
+                });
             }
             player.Write("PLAYERS", retMsg);
         }, true);
-        player.WaitForMsg("GAMESTATUS", (content) =>
-        {
-            Console.WriteLine($"{player.name}: {(GameStatus)int.Parse(content[0])}");
-        }, true);
 
-        return true;
-    }
-
-    public bool GetPlayersBack(out List<Player> players) {
-        if (!shouldClose)
-        {
-            players = new List<Player>(0);
-            return false;
-        }
-        lock (playersLock)
-        {
-            players = this.players;
-        }
         return true;
     }
 
@@ -122,6 +124,7 @@ public class GameRoom
                             gameStatus = GameStatus.PLAYING;
                             players.ForEach((player) =>
                             {
+                                player.ready = false;
                                 player.Write("STARTGAME", ((int)difficulty).ToString(), DateTime.Now.Millisecond.ToString());
                             });
                         }
