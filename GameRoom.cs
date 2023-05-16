@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 public class GameRoom
 {
     string name;
-    int maxPlayerCount;
+    int playerCount;
     Difficulty difficulty;
 
     List<Player> players = new List<Player>(0);
@@ -19,12 +19,12 @@ public class GameRoom
     public GameRoom(string name, int playerCount, Difficulty difficulty)
     {
         this.name = name;
-        this.maxPlayerCount = playerCount;
+        this.playerCount = playerCount;
         this.difficulty = difficulty;
 
         Task.Run(RunGame);
 
-        Console.WriteLine($"A sala {name} foi aberta");
+        Console.WriteLine($"A sala {name} foi aberta com as configurações:\nNúmero de jogadores: {playerCount}\nDificuldade: {difficulty}");
     }
 
     public string GetName()
@@ -49,7 +49,7 @@ public class GameRoom
     {
         lock (playersLock)
         {
-            if (players.Count >= maxPlayerCount)
+            if (players.Count >= playerCount)
                 return false;
         }
 
@@ -116,7 +116,7 @@ public class GameRoom
 
     public int GetPlayerLimit()
     {
-        return maxPlayerCount;
+        return playerCount;
     }
 
     public void RunGame()
@@ -128,7 +128,7 @@ public class GameRoom
                 case GameStatus.NOT_PLAYING:
                     lock (playersLock)
                     {
-                        if (players.Count == maxPlayerCount && AllReady())
+                        if (players.Count == playerCount && AllReady())
                         {
                             Console.WriteLine($"Sala {name} iniciando jogo");
 
@@ -143,8 +143,11 @@ public class GameRoom
                     break;
                 case GameStatus.PLAYING:
                     if (NoneReady())
+                    {
                         gameStatus = GameStatus.NOT_PLAYING;
-                    break;
+                        Console.WriteLine($"Sala {name} terminou um jogo");
+                    }
+                        break;
                 case GameStatus.WON:
 
                     break;

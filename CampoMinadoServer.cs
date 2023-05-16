@@ -45,7 +45,7 @@ class Campo_Minado_Server
                 {
                     if (gameRooms[i].shouldClose)
                     {
-                        Console.WriteLine($"A sala {gameRooms[i].GetName()} foi fechada");
+                        Console.WriteLine($"A sala {gameRooms[i].GetName()} foi fechada por estar vazia");
                         gameRooms.Remove(gameRooms[i]);
                         i--;
                     }
@@ -54,6 +54,7 @@ class Campo_Minado_Server
             Thread.Sleep(10000);
         }
 
+        Console.WriteLine("Servidor fechando");
         listener.Stop();
     }
 
@@ -110,6 +111,8 @@ class Campo_Minado_Server
                 if (RoomExists(content[0]))
                     return;
 
+                Console.WriteLine($"O jogador {newPlayer.name} criou a sala {content[0]}");
+
                 lock (gameRoomsLock)
                 {
                     gameRooms.Add(new GameRoom(content[0], int.Parse(content[1]), (Difficulty)int.Parse(content[2])));
@@ -120,6 +123,8 @@ class Campo_Minado_Server
             {
                 if (!RoomExists(content[0]))
                     return;
+
+                Console.WriteLine($"O jogador {newPlayer.name} entrou na sala {content[0]}");
 
                 if (FindRoomByName(content[0]).AddPlayer(newPlayer))
                     newPlayer.Write("ENTER_ROOM_SUCCESS");

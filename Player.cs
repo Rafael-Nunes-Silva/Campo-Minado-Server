@@ -23,7 +23,11 @@ public class Player
 
         Task.Run(Listen);
 
-        WaitForMsg("NAME", (content) => { name = content[0]; });
+        WaitForMsg("NAME", (content) =>
+        {
+            name = content[0];
+            Console.WriteLine($"O jogador {name} se conectou");
+        });
         WaitForMsg("READY", (content) => { ready = bool.Parse(content[0]); }, true);
         WaitForMsg("GAMESTATUS", (content) =>
         {
