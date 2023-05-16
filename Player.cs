@@ -83,7 +83,8 @@ public class Player
         }
         catch (Exception e)
         {
-            Console.WriteLine(e);
+            Console.WriteLine($"Falha ao se comunicar com o jogador {name}");
+            // Console.WriteLine(e);
             return false;
         }
     }
@@ -135,7 +136,8 @@ public class Player
             try { size = tcpConn.GetStream().Read(buffer, 0, buffer.Length); }
             catch (Exception e)
             {
-                Console.WriteLine(e);
+                Console.WriteLine($"Falha ao se comunicar com o jogador {name}");
+                // Console.WriteLine(e);
                 break;
             }
 

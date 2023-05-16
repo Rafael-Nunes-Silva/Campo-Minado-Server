@@ -61,14 +61,22 @@ class Campo_Minado_Server
     static void StartUp()
     {
         int port = 6778;
-        
+
         Console.Write("Insira a porta: ");
         try { port = int.Parse(Console.ReadLine()); }
-        catch (Exception e) { Console.WriteLine(e); }
+        catch (Exception e)
+        {
+            Console.WriteLine("Valor invalido");
+            Console.WriteLine(e);
+        }
 
         Console.Write("Insira o número máximo de salas: ");
         try { maxGameRooms = int.Parse(Console.ReadLine()); }
-        catch (Exception e) { Console.WriteLine(e); }
+        catch (Exception e)
+        {
+            Console.WriteLine("Valor invalido");
+            Console.WriteLine(e);
+        }
 
         listener = new TcpListener(System.Net.IPAddress.Any, port);
         listener.Start();
@@ -88,7 +96,8 @@ class Campo_Minado_Server
             try { newPlayer = new Player(listener.AcceptTcpClient()); }
             catch (Exception e)
             {
-                Console.WriteLine(e);
+                Console.WriteLine("Falha ao receber jogador");
+                // Console.WriteLine(e);
                 return;
             }
 
@@ -97,6 +106,14 @@ class Campo_Minado_Server
                 players.Add(newPlayer);
             }
 
+            newPlayer.WaitForMsg("DISCONNECT", (content) =>
+            {
+                lock (playersLock)
+                {
+                    players.Remove(newPlayer);
+                }
+                Console.WriteLine($"O jogador {newPlayer.name} desconectou");
+            }, true);
             newPlayer.WaitForMsg("GET_ROOMS", (content) =>
             {
                 string retMsg = "Salas:\nnome, lugares\n";

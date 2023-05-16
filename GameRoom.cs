@@ -73,6 +73,7 @@ public class GameRoom
                 if (players.Count == 0)
                     shouldClose = true;
             }
+            Console.WriteLine($"O jogador {player.name} saiu da sala {name}");
         });
         player.WaitForMsg("GET_PLAYERS", (content) =>
         {
@@ -147,7 +148,7 @@ public class GameRoom
                         gameStatus = GameStatus.NOT_PLAYING;
                         Console.WriteLine($"Sala {name} terminou um jogo");
                     }
-                        break;
+                    break;
                 case GameStatus.WON:
 
                     break;
