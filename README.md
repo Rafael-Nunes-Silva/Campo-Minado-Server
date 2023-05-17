@@ -1,6 +1,6 @@
 # Campo-Minado-Server
 
-Esse é o servidor necessário para o modo multiplayer do <a src="https://github.com/Rafael-Nunes-Silva/Campo-Minado">Campo-Minado</a>.
+Esse é o servidor necessário para o modo multiplayer do <a href="https://github.com/Rafael-Nunes-Silva/Campo-Minado">Campo-Minado</a>.
 
 
 
