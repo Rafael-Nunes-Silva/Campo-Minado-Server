@@ -2,6 +2,8 @@
 
 Esse é o servidor necessário para o modo multiplayer do <a href="https://github.com/Rafael-Nunes-Silva/Campo-Minado">Campo-Minado</a>.
 
+<img width="100%" src="https://github.com/Rafael-Nunes-Silva/Campo-Minado-Server/assets/76886825/3aa14079-b7f9-40fd-bb66-e9732d29d26b">
+
 
 
 # Como Rodar
